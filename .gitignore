@@ -1,3 +1,4 @@
+data/
 .venv/pyvenv.cfg
 .venv/Include/site/python3.9/pygame/_blit_info.h
 .venv/Include/site/python3.9/pygame/_camera.h
