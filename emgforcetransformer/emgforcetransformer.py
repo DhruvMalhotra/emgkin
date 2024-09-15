@@ -172,5 +172,5 @@ class EMGForceTransformer(nn.Module):
         # [num_chunks, channels_force, fc_force]
         predicted_force = self.output_projection(transformer_output)
 
-        # TODO(dhruv): Do we calculate the error between output and the non-Positionally encoded force chunks?
+        # TODO(dhruv): Do we calculate the error between output and the "non-Positionally" encoded force chunks?
         return predicted_force, force_chunks  # Return target for loss computation
