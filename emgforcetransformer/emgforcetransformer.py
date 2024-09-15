@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-
 class EMGForceTransformer(nn.Module):
     def __init__(self, d=512, d_latent=256, channels_emg=256, channels_force=5,
                  fps_emg=2048, fps_force=100,
@@ -36,8 +35,8 @@ class EMGForceTransformer(nn.Module):
                                           num_decoder_layers=num_decoder_layers,
                                           dim_feedforward=d_latent)
 
-        # TODO(dhruv): Chat GPT wants to put this in, why???
         # Output projection layer to map transformer outputs to force data
+        # Chat GPT wants to put this in, why???
         self.output_projection = nn.Linear(d, self.fc_force)
 
         # Precompute positional embeddings
