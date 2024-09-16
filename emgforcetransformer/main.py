@@ -17,8 +17,8 @@ if __name__ == "__main__":
 
     # Example input data (random tensors for illustration)
     # Replace with actual EMG and force data tensors
-    emg_data = torch.randn(2048 * 10, 256)  # 10 seconds of EMG data
-    force_data = torch.randn(100 * 10, 5)    # 10 seconds of force data
+    emg_data = torch.randn(204 * 20, 256)  # 2 seconds of EMG data
+    force_data = torch.randn(10 * 20, 5)    # 2 seconds of force data
 
     for epoch in range(NUM_EPOCHS):
         # Forward pass
