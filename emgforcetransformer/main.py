@@ -5,7 +5,13 @@ from emgforcetransformer import EMGForceTransformer
 # Sample training loop
 if __name__ == "__main__":
     # Create the model
-    model = EMGForceTransformer()
+    # model = EMGForceTransformer()
+
+    model = EMGForceTransformer(d=8, d_latent=5, channels_emg=256, channels_force=5,
+                 fps_emg=2048, fps_force=100,
+                 chunk_secs=0.1,
+                 num_encoder_layers=1, num_decoder_layers=1, nhead=1)
+    
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     NUM_EPOCHS = 10  # Example number of epochs
 
