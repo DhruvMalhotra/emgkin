@@ -1931,3 +1931,4 @@ data/
 __pycache__/upsample_fractional.cpython-38.pyc
 __pycache__/upsample_fractional.cpython-39.pyc
 __pycache__/upsample_fractional.cpython-312.pyc
+emgforcetransformer/__pycache__/

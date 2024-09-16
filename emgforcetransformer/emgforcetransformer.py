@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import math
 
 
@@ -11,7 +10,6 @@ class EMGForceTransformer(nn.Module):
                  num_encoder_layers=6, num_decoder_layers=6, nhead=8):
         super().__init__()
         self.d = d  # Embedding dimension
-        # Latent dimension used in the MLP before and within the transformer
         self.d_latent = d_latent
         self.channels_emg = channels_emg
         self.channels_force = channels_force
@@ -22,8 +20,7 @@ class EMGForceTransformer(nn.Module):
 
         # Calculate frames in a chunk and ensure they are integers
         self.fc_emg = int(chunk_secs * fps_emg)  # frames in a chunk (emg)
-        # frames in a chunk (force)
-        self.fc_force = int(chunk_secs * fps_force)
+        self.fc_force = int(chunk_secs * fps_force) # frames in a chunk (force)
 
         # Encoder Input: projection layer to map emg input to d
         self.input_projection = nn.Linear(self.fc_emg, d, bias=True)
