@@ -3,10 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
+
 class EMGForceTransformer(nn.Module):
     def __init__(self, d=512, d_latent=256, channels_emg=256, channels_force=5,
                  fps_emg=2048, fps_force=100,
-                 chunk_secs=0.1,
+                 chunk_secs=0.1, num_chunks=20,  # sequence length
                  num_encoder_layers=6, num_decoder_layers=6, nhead=8):
         super().__init__()
         self.d = d  # Embedding dimension
@@ -15,6 +16,7 @@ class EMGForceTransformer(nn.Module):
         self.channels_emg = channels_emg
         self.channels_force = channels_force
         self.chunk_secs = chunk_secs  # chunk size in seconds
+        self.num_chunks = num_chunks  # sequence length
         self.fps_emg = fps_emg
         self.fps_force = fps_force
 
@@ -23,11 +25,14 @@ class EMGForceTransformer(nn.Module):
         # frames in a chunk (force)
         self.fc_force = int(chunk_secs * fps_force)
 
-        # Embedding weight matrices initialized randomly
-        self.w1_emg = nn.Parameter(torch.randn(d_latent, self.fc_emg))
-        self.w2_emg = nn.Parameter(torch.randn(d, self.d_latent))
-        self.w1_force = nn.Parameter(torch.randn(d_latent, self.fc_force))
-        self.w2_force = nn.Parameter(torch.randn(d, self.d_latent))
+        # Encoder Input: projection layer to map emg input to d
+        self.input_projection = nn.Linear(self.fc_emg, d, bias=True)
+
+        # Decoder Input: learnable rand. Called "object_queries" in https://arxiv.org/pdf/2005.12872 Fig 2
+        self.object_queries = nn.Parameter(torch.randn(channels_force, d))
+
+        # Decoder Output: projection layer to map transformer outputs to force data
+        self.output_projection = nn.Linear(d, self.fc_force, bias=True)
 
         # Transformer model
         self.transformer = nn.Transformer(d_model=d, nhead=nhead,
@@ -35,40 +40,43 @@ class EMGForceTransformer(nn.Module):
                                           num_decoder_layers=num_decoder_layers,
                                           dim_feedforward=d_latent)
 
-        # Output projection layer to map transformer outputs to force data
-        # Chat GPT wants to put this in, why???
-        self.output_projection = nn.Linear(d, self.fc_force)
-
         # Precompute positional embeddings
-        self.emg_pos_embedding = self.get_emg_positional_embeddings(d)
-        self.force_pos_embedding = self.get_force_positional_embeddings(d)
+        # Shape: [num_chunks*channels_emg, d]
+        self.emg_pos_embedding = self.get_emg_positional_embeddings()
+        # Shape: [num_chunks*channels_force, d]
+        self.force_pos_embedding = self.get_force_positional_embeddings()
 
-    def get_emg_positional_embeddings(self, d):
+    def get_emg_positional_embeddings(self):
         """
-        Generates 3D positional embeddings for the EMG sensors arranged in 4 arrays of 8x8 each.
+        Generates 4D positional embeddings for T and the EMG sensors arranged in 4 arrays of 8x8 each.
         """
         # Generate positions for each of the 256 EMG channels
         positions = []
-        for array_idx in range(4):
-            for x in range(8):
-                for y in range(8):
-                    positions.append([array_idx, x, y])
+        for chunk_idx in range(self.num_chunks):
+            for array_idx in range(4):
+                for x in range(8):
+                    for y in range(8):
+                        positions.append([chunk_idx, array_idx, x, y])
         positions = torch.tensor(
-            positions, dtype=torch.float)  # Shape: [256, 3]
+            positions, dtype=torch.float)  # Shape: [num_chunks*256, 4]
 
         # Compute sinusoidal positional embeddings
-        pe = self.compute_positional_embeddings(positions, d)
-        return pe  # Shape: [256, D]
+        pe = self.compute_positional_embeddings(positions, self.d)
+        return pe  # Shape: [num_chunks*channels_emg, d]
 
-    def get_force_positional_embeddings(self, d):
+    def get_force_positional_embeddings(self):
         """
-        Generates 1D positional embeddings for the 5 force channels.
+        Generates 2D positional embeddings for T and the 5 force channels.
         """
-        positions = torch.arange(self.channels_force,
-                                 # Shape: [5, 1]
-                                 dtype=torch.float).unsqueeze(1)
-        pe = self.compute_positional_embeddings(positions, d)
-        return pe  # Shape: [5, D]
+        positions = []
+        for chunk_idx in range(self.num_chunks):
+            for f in range(self.channels_force):
+                positions.append([chunk_idx, f])
+        positions = torch.tensor(
+            positions, dtype=torch.float)  # Shape: [num_chunks*5, 2]
+
+        pe = self.compute_positional_embeddings(positions, self.d)
+        return pe  # Shape: [num_chunks*channels_force, d]
 
     def compute_positional_embeddings(self, positions, d):
         """
@@ -97,80 +105,55 @@ class EMGForceTransformer(nn.Module):
 
     def forward(self, emg_data, force_data):
         """
-        emg_data: Tensor of shape [num_samples_emg, emg_channels]
-        force_data: Tensor of shape [num_samples_force, force_channels]
+        emg_data: Tensor of shape [num_chunks*chunk_secs*fps_emg, emg_channels]
+        force_data: Tensor of shape [num_chunks*chunk_secs*fps_force, force_channels]
         """
 
-        # Step 1: Assuming both start at the same time,
+        # Step 1: Assert shape
         # get the duration (in secs) of the shorter stream.
-        t_secs = min(emg_data.shape[0]/self.fps_emg,
-                     force_data.shape[0]/self.fps_force)
+        assert emg_data.shape[0], self.num_chunks * self.chunk_secs*self.fps_emg
+        assert force_data.shape[0], self.num_chunks * self.chunk_secs*self.fps_force
 
         # Step 2: Chunk the data into segments of chunk_secs
-        # Calculate the number of chunks that will fit
-        num_chunks = int(t_secs/self.chunk_secs)
-
-        # Trim extra samples to make data divisible by chunk size
-        emg_data = emg_data[:num_chunks * self.fc_emg, :]
-        force_data = force_data[:num_chunks * self.fc_force, :]
-
         # Reshape and transpose to get chunks: [t_secs/chunk_size, channels, frames in Chunk]
         emg_chunks = emg_data.view(
-            num_chunks, self.fc_emg, self.channels_emg).transpose(1, 2)
+            self.num_chunks, self.fc_emg, self.channels_emg).transpose(1, 2)
         force_chunks = force_data.view(
-            num_chunks, self.fc_force, self.channels_force).transpose(1, 2)
+            self.num_chunks, self.fc_force, self.channels_force).transpose(1, 2)
 
-        # Step 3: Embed each chunk to D dimensions using learned weights and ReLU activation
-        # For EMG data
-        v_emg_w1 = torch.einsum('lf,Tcf->Tcl', self.w1_emg, emg_chunks)
-        v_emg_relu = F.relu(v_emg_w1)
+        # Step 3: Embed each emg chunk to D dimensions
         # [num_chunks, channels_emg, d]
-        v_emg_embedded = torch.einsum('dl,Tcl->Tcd', self.w2_emg, v_emg_relu)
+        v_emg_embedded = self.input_projection(emg_chunks)
 
-        # For force data
-        v_force_w1 = torch.einsum('lf,Tcf->Tcl', self.w1_force, force_chunks)
-        v_force_relu = F.relu(v_force_w1)
-        # [num_chunks, channels_force, d]
-        v_force_embedded = torch.einsum(
-            'dl,Tcl->Tcd', self.w2_force, v_force_relu)
-
-        # Step 4: Add positional embeddings
-        # Since positions are constant for channels, we can expand them over time
-        emg_pos_embedding = self.emg_pos_embedding  # Shape: [channels_emg, d]
-        # Shape: [channels_force, d]
-        force_pos_embedding = self.force_pos_embedding
-
-        # Expand positional embeddings to match [num_chunks, channels, d]
-        emg_pos_embedding = emg_pos_embedding.unsqueeze(0).expand(
-            num_chunks, -1, -1)  # [num_chunks, channels_emg, d]
-        force_pos_embedding = force_pos_embedding.unsqueeze(0).expand(
-            num_chunks, -1, -1)  # [num_chunks, channels_force, d]
-
-        # Add positional embeddings
-        v_emg_embedded += emg_pos_embedding
-        v_force_embedded += force_pos_embedding
+        # Step 4: Repeat object queries, num_chunks time. Use .expand() to share same underlying data.
+        v_force_embedded = self.object_queries.unsqueeze(0).expand(
+            self.num_chunks, -1, -1)  # [num_chunks, channels_force, d]
+        assert v_force_embedded.numel() == self.num_chunks*self.channels_force*self.d
 
         # Step 5: Reshape to 1D sequence suitable for the transformer
         # Transformer expects input of shape [Sequence Length, Batch Size, Embedding Dim]
         # using batch size = 1 for now.
-        emg_sequence = v_emg_embedded.view(
-            num_chunks*self.channels_emg, 1, self.d)
-        force_sequence = v_force_embedded.view(
-            num_chunks*self.channels_force, 1, self.d)
+        emg_sequence = v_emg_embedded.reshape(
+            self.num_chunks*self.channels_emg, 1, self.d)
+        force_sequence = v_force_embedded.reshape(
+            self.num_chunks*self.channels_force, 1, self.d)
+        
+        # Step 6: Add positional embeddings, unsqueeze to allow for batch dim
+        emg_sequence += self.emg_pos_embedding.unsqueeze(1)
+        force_sequence += self.force_pos_embedding.unsqueeze(1)
 
-        # Step 6 & 7: Pass through transformer encoder and decoder
+
+        # Step 7 & 8: Pass through transformer encoder and decoder
         transformer_output = self.transformer(
             src=emg_sequence, tgt=force_sequence)
         # transformer_output: [num_chunks*self.channels_force, 1, d]
 
-        # Reshape transformer output to [num_chunks, channels_force, d]
+        # Step 9: Reshape transformer output to [num_chunks, channels_force, d]
         transformer_output = transformer_output.view(
-            num_chunks, self.channels_force, self.d)
+            self.num_chunks, self.channels_force, self.d)
 
         # Map transformer outputs to predicted force data
-        # TODO(dhruv): Why is this needed?
         # [num_chunks, channels_force, fc_force]
         predicted_force = self.output_projection(transformer_output)
 
-        # TODO(dhruv): Do we calculate the error between output and the "non-Positionally" encoded force chunks?
         return predicted_force, force_chunks  # Return target for loss computation
