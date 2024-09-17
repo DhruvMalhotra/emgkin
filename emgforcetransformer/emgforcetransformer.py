@@ -2,10 +2,9 @@ import torch
 import torch.nn as nn
 import math
 
-
 class EMGForceTransformer(nn.Module):
     def __init__(self, d=512, d_latent=256, channels_emg=256, channels_force=5,
-                 fps_emg=2048, fps_force=100,
+                 fps_emg=2050, fps_force=100,
                  chunk_secs=0.1, num_chunks=20,  # sequence length
                  num_encoder_layers=6, num_decoder_layers=6, nhead=8):
         super().__init__()
