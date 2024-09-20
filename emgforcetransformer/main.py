@@ -10,7 +10,7 @@ batches_before_validation = 10
 fraction_of_validation_set_to_infer = 0.5
 
 # epoch/batch
-num_epochs = 1
+num_epochs = 5
 batch_size = 5
 learning_rate = 1e-3
 chunk_secs = 0.25

@@ -75,11 +75,12 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
             emg_batch = emg_batch.to(device)
             force_batch = force_batch.to(device)
             # Forward pass
-            # [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
-            predicted_force, target_force = model(emg_batch, force_batch)
+            # [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels] ->
+            # [batch_size, num_chunks*chunk_secs*fps_force, force_channels]
+            predicted_force = model(emg_batch)
 
             # Compute loss
-            loss = criterion(predicted_force, target_force)
+            loss = criterion(predicted_force, force_batch)
 
             # Print training loss
             print(f'Training Loss at step {global_step}: {loss.item():.4f}')
@@ -105,8 +106,8 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
                         emg_val = emg_val.to(device)
                         force_val = force_val.to(device)
 
-                        predicted_force_val, target_force_val = model(emg_val, force_val)
-                        val_loss += criterion(predicted_force_val, target_force_val).item()
+                        predicted_force_val = model(emg_val)
+                        val_loss += criterion(predicted_force_val, force_val).item()
                         val_steps += 1
 
                 avg_val_loss = val_loss / val_steps if val_steps > 0 else 0

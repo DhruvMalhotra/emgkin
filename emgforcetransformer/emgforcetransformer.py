@@ -100,23 +100,20 @@ class EMGForceTransformer(nn.Module):
 
         return pe
 
-    def forward(self, emg_data, force_data):
+    def forward(self, emg_data):
         """
         emg_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
-        force_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_force, force_channels]
         """
         batch_size = emg_data.shape[0]  # Extract batch size
 
         # Step 1: Assert shape
         assert emg_data.shape[1], self.num_chunks * self.chunk_secs * self.fps_emg
-        assert force_data.shape[1], self.num_chunks * self.chunk_secs * self.fps_force
 
         # Step 2: Chunk the data into segments of chunk_secs
         # Reshape and transpose to get chunks: [batch_size, num_chunks, channels, frames in Chunk]
         emg_chunks = emg_data.view(
             batch_size, self.num_chunks, self.fc_emg, self.channels_emg).transpose(2, 3)
-        force_chunks = force_data.view(
-            batch_size, self.num_chunks, self.fc_force, self.channels_force).transpose(2, 3)
+       
 
         # Step 3: Embed each emg chunk to D dimensions
         # [batch_size, num_chunks, channels_emg, d]
@@ -153,5 +150,11 @@ class EMGForceTransformer(nn.Module):
         # Map transformer outputs to predicted force data
         # [batch_size, num_chunks, channels_force, fc_force]
         predicted_force = self.output_projection(transformer_output)  # nn.Linear applies to last dimension
-
-        return predicted_force, force_chunks  # Return target for loss computation
+        predicted_force = predicted_force.transpose(2, 3)
+        
+        assert self.fc_force == self.chunk_secs * self.fps_force
+        predicted_force = predicted_force.reshape(
+            batch_size, self.num_chunks*self.fc_force, self.channels_force)
+        
+        # Return: [batch_size, num_chunks*chunk_secs*fps_force, force_channels]
+        return predicted_force
