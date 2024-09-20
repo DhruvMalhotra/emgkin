@@ -1,19 +1,19 @@
 import wfdb
 import torch
 
-def load_raw_data():
+def load_raw_data(rootpath, subject, sessions, fingers, samples):
     raw_emg_list = []
     raw_force_list = []
-    for subject_idx in range(4):
-        for session_idx in range(1):
-            for finger_idx in range(3):
-                for sample_idx in range(3):
+    for subject_idx in range(subject):
+        for session_idx in range(sessions):
+            for finger_idx in range(fingers):
+                for sample_idx in range(samples):
                     suffix = 'finger'+str(finger_idx+1)+'_sample'+str(sample_idx+1)
                     prefix = 'subject0'+ str(subject_idx+1) +'_session'+ str(session_idx+1)
                     record_emg = wfdb.rdrecord(
-                        '../data/1dof_dataset/'+ prefix +'/1dof_preprocess_' + suffix)
+                        rootpath + '/'+ prefix +'/1dof_preprocess_' + suffix)
                     record_force = wfdb.rdrecord(
-                        '../data/1dof_dataset/'+ prefix +'/1dof_force_' + suffix)
+                        rootpath + '/'+ prefix +'/1dof_force_' + suffix)
                     emg_raw = torch.tensor(record_emg.__dict__[
                                         # [2048*25, 256]
                                         'p_signal'], dtype=torch.float32)
