@@ -3,10 +3,10 @@ import torch.nn as nn
 import math
 
 class EMGForceTransformer(nn.Module):
-    def __init__(self, d=512, d_latent=256, channels_emg=256, channels_force=5,
-                 fps_emg=2050, fps_force=100,
-                 chunk_secs=0.1, num_chunks=20,  # sequence length
-                 num_encoder_layers=6, num_decoder_layers=6, nhead=8):
+    def __init__(self, channels_emg, channels_force,
+                 fps_emg, fps_force,
+                 chunk_secs, num_chunks,  # sequence length
+                 d=512, d_latent=256, num_encoder_layers=6, num_decoder_layers=6, nhead=8):
         super().__init__()
         self.d = d  # Embedding dimension
         self.d_latent = d_latent
@@ -105,7 +105,6 @@ class EMGForceTransformer(nn.Module):
         emg_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
         force_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_force, force_channels]
         """
-
         batch_size = emg_data.shape[0]  # Extract batch size
 
         # Step 1: Assert shape
@@ -136,9 +135,11 @@ class EMGForceTransformer(nn.Module):
             batch_size, self.num_chunks*self.channels_force, self.d)
         
         # Step 6: Add positional embeddings, unsqueeze to allow for batch dim
-        emg_sequence += self.emg_pos_embedding.unsqueeze(0)
-        force_sequence += self.force_pos_embedding.unsqueeze(0)
-
+        device = emg_data.device
+        emg_pos_embedding = self.emg_pos_embedding.to(device)
+        force_pos_embedding = self.force_pos_embedding.to(device)
+        emg_sequence += emg_pos_embedding.unsqueeze(0)
+        force_sequence += force_pos_embedding.unsqueeze(0)
 
         # Step 7 & 8: Pass through transformer encoder and decoder
         transformer_output = self.transformer(

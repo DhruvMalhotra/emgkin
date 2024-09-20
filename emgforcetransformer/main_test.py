@@ -1,5 +1,6 @@
 from emgforcetransformer import EMGForceTransformer
 from train_model import train_model
+from upsample import upsample_fractional
 import torch
 
 # Example usage:
@@ -21,8 +22,8 @@ num_epochs = 10
 batch_size = 2
 learning_rate = 1e-4
 
-emg_data = torch.randn(100, 2050*2, 256)
-force_data = torch.randn(100, 100*2, 5)
+emg_data = torch.randn(100, 2048*2.5, 256)
+force_data = torch.randn(100, 100*2.5, 5)
 
 # Start training
 train_model(model, emg_data, force_data,

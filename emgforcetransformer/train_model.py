@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader, random_split
+import wandb
 
 # Function to create DataLoaders for training and validation
-def create_dataloaders(emg_data, force_data, validation_fraction, batch_size):
+def create_dataloaders_random(emg_data, force_data, validation_fraction, batch_size):
     dataset = TensorDataset(emg_data, force_data)
     total_samples = len(dataset)
     val_size = int(validation_fraction * total_samples)
@@ -16,10 +17,37 @@ def create_dataloaders(emg_data, force_data, validation_fraction, batch_size):
 
     return train_loader, val_loader_full
 
+def create_dataloaders(emg_data, force_data, validation_fraction, batch_size):
+    from torch.utils.data import TensorDataset, DataLoader, Subset
+    
+    dataset = TensorDataset(emg_data, force_data)
+    total_samples = len(dataset)
+    val_size = int(validation_fraction * total_samples)
+    train_size = total_samples - val_size
+
+    # Create a list of indices from 0 to total_samples - 1
+    indices = list(range(total_samples))
+
+    # Split the indices based on the desired fraction
+    train_indices = indices[:train_size]
+    val_indices = indices[train_size:]
+
+    # Create subsets using the specified indices
+    train_dataset = Subset(dataset, train_indices)
+    val_dataset = Subset(dataset, val_indices)
+
+    # Create DataLoaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader_full = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+
+    return train_loader, val_loader_full
+
 # Training loop
 def train_model(model, emg_data, force_data, validation_fraction=0.2,
                 batches_before_validation=100, fraction_of_validation_set_to_infer=0.5,
                 num_epochs=10, batch_size=32, learning_rate=1e-4):
+    # Initialize wandb
+    wandb.init(project="emgforcetransformer")
     
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -46,8 +74,8 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
         for batch_idx, (emg_batch, force_batch) in enumerate(train_loader):
             emg_batch = emg_batch.to(device)
             force_batch = force_batch.to(device)
-
             # Forward pass
+            # [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
             predicted_force, target_force = model(emg_batch, force_batch)
 
             # Compute loss
@@ -55,6 +83,8 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
 
             # Print training loss
             print(f'Training Loss at step {global_step}: {loss.item():.4f}')
+            # Log training loss
+            wandb.log({"Training Loss": loss.item(), "Global Step": global_step})
 
             # Backward pass and optimization
             optimizer.zero_grad()
@@ -80,10 +110,14 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
                         val_steps += 1
 
                 avg_val_loss = val_loss / val_steps if val_steps > 0 else 0
+
                 print(f'Validation Loss at step {global_step}: {avg_val_loss:.4f}')
+                wandb.log({"Validation Loss": avg_val_loss, "Global Step": global_step})
+
                 model.train()  # Switch back to training mode
 
         # Optionally, you can save the model after each epoch
         # torch.save(model.state_dict(), f'model_epoch_{epoch+1}.pth')
 
     print('Training complete.')
+    wandb.finish()
