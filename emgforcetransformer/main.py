@@ -9,9 +9,9 @@ validation_fraction = 0.25
 batches_before_validation = 10
 
 # epoch/batch
-num_epochs = 5
+num_epochs = 1
 batch_size = 5
-learning_rate = 1e-3
+lr_max = 1e-2
 chunk_secs = 0.50
 num_chunks = 50
 assert num_chunks*chunk_secs == 25 # Each file is 25s, and is a sequence
@@ -31,7 +31,7 @@ fps_force = 100
 # validation_set = load_raw_data()
 # Initialize lazy-loading DataLoaders
 train_loader, val_loader = create_dataloaders_lazy(
-    validation_fraction, batch_size, r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset", 8, 2, 5, 3)
+    validation_fraction, batch_size, r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset", 16, 2, 5, 3)
 
 assert (fps_emg*chunk_secs).is_integer()
 assert (fps_force*chunk_secs).is_integer()
@@ -52,4 +52,4 @@ train_model(model, train_loader, val_loader,
             batches_before_validation=batches_before_validation,
             num_epochs=num_epochs,
             batch_size=batch_size,
-            learning_rate=learning_rate)
+            lr_max=lr_max)
