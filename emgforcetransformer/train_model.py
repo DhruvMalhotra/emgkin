@@ -15,14 +15,11 @@ def get_lr(step, total_steps, lr_max, warmup_steps):
         return lr_max * 0.5 * (1 + math.cos(math.pi * (step - warmup_steps) / (total_steps - warmup_steps)))
 
 # Training loop
-def train_model(model, train_loader, val_loader,
+def train_model(device, model, train_loader, val_loader,
                 batches_before_validation=100,
                 num_epochs=10, batch_size=32, lr_max=1e-2):
     # Initialize wandb
     wandb.init(project="emgforcetransformer")
-    
-    # Device configuration
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
 
     # Define optimizer and loss function
