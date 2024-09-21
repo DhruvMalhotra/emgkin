@@ -93,6 +93,6 @@ def train_model(device, model, train_loader, val_loader,
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Save the model state dictionary with a timestamp in the filename
-    model_filename = f'emg_force_transformer_{timestamp}.pth'
+    model_filename = f'model_saves/emg_force_transformer_{timestamp}.pth'
     torch.save(model.state_dict(), model_filename)
     wandb.finish()
