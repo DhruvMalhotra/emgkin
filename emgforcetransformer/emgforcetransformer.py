@@ -38,7 +38,7 @@ class EMGForceTransformer(nn.Module):
                                           batch_first=True)
 
         # Precompute positional embeddings
-        # Shape: [num_chunks*channels_emg, d]
+        # Shape: [num_chunks*channels_emg, d] 
         self.emg_pos_embedding = self.get_emg_positional_embeddings()
         # Shape: [num_chunks*channels_force, d]
         self.force_pos_embedding = self.get_force_positional_embeddings()
