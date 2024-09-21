@@ -114,7 +114,6 @@ class EMGForceTransformer(nn.Module):
         emg_chunks = emg_data.view(
             batch_size, self.num_chunks, self.fc_emg, self.channels_emg).transpose(2, 3)
        
-
         # Step 3: Embed each emg chunk to D dimensions
         # [batch_size, num_chunks, channels_emg, d]
         v_emg_embedded = self.input_projection(emg_chunks) # nn.Linear applies to last dimension

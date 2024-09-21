@@ -1,20 +1,20 @@
 from emgforcetransformer import EMGForceTransformer
 from train_model import train_model
-from load_data import load_raw_data
+from load_data import create_dataloaders_lazy, debug_dataloader
 
 # Define your parameters
 
 # training loop
 validation_fraction = 0.25
 batches_before_validation = 10
-fraction_of_validation_set_to_infer = 0.5
 
 # epoch/batch
 num_epochs = 5
 batch_size = 5
 learning_rate = 1e-3
-chunk_secs = 0.25
-num_chunks = 20
+chunk_secs = 0.50
+num_chunks = 50
+assert num_chunks*chunk_secs == 25 # Each file is 25s, and is a sequence
 
 # transformer
 d = 8
@@ -28,7 +28,10 @@ channels_emg = 256
 channels_force = 5
 fps_emg = 2048
 fps_force = 100
-emg_raw, force_raw = load_raw_data(r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset", 4, 1, 5, 3)
+# validation_set = load_raw_data()
+# Initialize lazy-loading DataLoaders
+train_loader, val_loader = create_dataloaders_lazy(
+    validation_fraction, batch_size, r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset", 8, 2, 5, 3)
 
 assert (fps_emg*chunk_secs).is_integer()
 assert (fps_force*chunk_secs).is_integer()
@@ -42,18 +45,11 @@ model = EMGForceTransformer(d=d, d_latent=d_latent, channels_emg=channels_emg,
                             num_encoder_layers=num_encoder_layers,
                             num_decoder_layers=num_decoder_layers,
                             nhead=nhead)
-emg_data = emg_raw.view(-1, num_chunks*int(fps_emg*chunk_secs), channels_emg)
-force_data = force_raw.view(-1, num_chunks*int(fps_force*chunk_secs), channels_force)
-
-print("emg_data.shape:"+str(emg_data.shape))
-print("force_data.shape:"+str(force_data.shape))
 
 # Start training
 # Data has to be: [num_batches*batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
-train_model(model, emg_data, force_data,
-            validation_fraction=validation_fraction,
+train_model(model, train_loader, val_loader,
             batches_before_validation=batches_before_validation,
-            fraction_of_validation_set_to_infer=fraction_of_validation_set_to_infer,
             num_epochs=num_epochs,
             batch_size=batch_size,
             learning_rate=learning_rate)

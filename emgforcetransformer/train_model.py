@@ -2,49 +2,11 @@ import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader, random_split
 import wandb
-
-# Function to create DataLoaders for training and validation
-def create_dataloaders_random(emg_data, force_data, validation_fraction, batch_size):
-    dataset = TensorDataset(emg_data, force_data)
-    total_samples = len(dataset)
-    val_size = int(validation_fraction * total_samples)
-    train_size = total_samples - val_size
-
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
-
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader_full = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-
-    return train_loader, val_loader_full
-
-def create_dataloaders(emg_data, force_data, validation_fraction, batch_size):
-    from torch.utils.data import TensorDataset, DataLoader, Subset
-    
-    dataset = TensorDataset(emg_data, force_data)
-    total_samples = len(dataset)
-    val_size = int(validation_fraction * total_samples)
-    train_size = total_samples - val_size
-
-    # Create a list of indices from 0 to total_samples - 1
-    indices = list(range(total_samples))
-
-    # Split the indices based on the desired fraction
-    train_indices = indices[:train_size]
-    val_indices = indices[train_size:]
-
-    # Create subsets using the specified indices
-    train_dataset = Subset(dataset, train_indices)
-    val_dataset = Subset(dataset, val_indices)
-
-    # Create DataLoaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader_full = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-
-    return train_loader, val_loader_full
+from datetime import datetime
 
 # Training loop
-def train_model(model, emg_data, force_data, validation_fraction=0.2,
-                batches_before_validation=100, fraction_of_validation_set_to_infer=0.5,
+def train_model(model, train_loader, val_loader,
+                batches_before_validation=100,
                 num_epochs=10, batch_size=32, learning_rate=1e-4):
     # Initialize wandb
     wandb.init(project="emgforcetransformer")
@@ -52,26 +14,19 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
     # Device configuration
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = model.to(device)
-    emg_data = emg_data.to(device)
-    force_data = force_data.to(device)
-
-    # Create DataLoaders
-    train_loader, val_loader_full = create_dataloaders(emg_data, force_data,
-                                                       validation_fraction, batch_size)
-
-    # Calculate number of validation batches to use
-    total_val_batches = len(val_loader_full)
-    val_batches_to_use = int(fraction_of_validation_set_to_infer * total_val_batches)
 
     # Define optimizer and loss function
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
     criterion = nn.MSELoss()
 
     global_step = 0
+    
     for epoch in range(num_epochs):
         print(f'Epoch {epoch+1}/{num_epochs}')
         model.train()
         for batch_idx, (emg_batch, force_batch) in enumerate(train_loader):
+            print(f"Batch {batch_idx}:")
+            
             emg_batch = emg_batch.to(device)
             force_batch = force_batch.to(device)
             # Forward pass
@@ -100,9 +55,7 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
                 val_loss = 0.0
                 val_steps = 0
                 with torch.no_grad():
-                    for val_idx, (emg_val, force_val) in enumerate(val_loader_full):
-                        if val_idx >= val_batches_to_use:
-                            break
+                    for val_idx, (emg_val, force_val) in enumerate(val_loader):
                         emg_val = emg_val.to(device)
                         force_val = force_val.to(device)
 
@@ -121,4 +74,10 @@ def train_model(model, emg_data, force_data, validation_fraction=0.2,
         # torch.save(model.state_dict(), f'model_epoch_{epoch+1}.pth')
 
     print('Training complete.')
+    # Get the current timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Save the model state dictionary with a timestamp in the filename
+    model_filename = f'emg_force_transformer_{timestamp}.pth'
+    torch.save(model.state_dict(), model_filename)
     wandb.finish()
