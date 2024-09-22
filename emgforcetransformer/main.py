@@ -10,19 +10,19 @@ validation_fraction = 0.25
 batches_before_validation = 10
 
 # epoch/batch
-num_epochs = 1
+num_epochs = 5
 batch_size = 5
-lr_max = 1e-3
-chunk_secs = 0.50
-num_chunks = 50
+lr_max = 1e-4
+chunk_secs = 1
+num_chunks = 25
 assert num_chunks*chunk_secs == 25 # Each file is 25s, and is a sequence
 
 # transformer
 d = 512
 d_latent = 256
-num_encoder_layers = 4
-num_decoder_layers = 4
-nhead = 4
+num_encoder_layers = 6
+num_decoder_layers = 6
+nhead = 8
 
 # data
 channels_emg = 256
@@ -34,7 +34,7 @@ fps_force = 100
 train_loader, val_loader = create_dataloaders_lazy(
     validation_fraction, batch_size,
     r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset",
-    16, 2, 5, 3)
+    20, 2, 5, 3)
 
 assert (fps_emg*chunk_secs).is_integer()
 assert (fps_force*chunk_secs).is_integer()
@@ -57,5 +57,4 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 train_model(device, model, train_loader, val_loader,
             batches_before_validation=batches_before_validation,
             num_epochs=num_epochs,
-            batch_size=batch_size,
             lr_max=lr_max)
