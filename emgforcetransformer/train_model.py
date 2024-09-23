@@ -3,6 +3,7 @@ import torch.nn as nn
 import wandb
 from datetime import datetime
 import math
+import os
 from force_classify import classify
 
 def get_lr(step, total_steps, lr_max, warmup_steps):
@@ -32,7 +33,8 @@ def train_model(device, model, train_loader, val_loader,
                 batches_before_validation=100,
                 num_epochs=10, lr_max=1e-4):
     # Initialize wandb
-    wandb.init(project="emgforcetransformer-einsir")
+    os.environ["WANDB_SILENT"] = "true"
+    wandb.init(project = "emgforcetransformer-einsir")
     model = model.to(device)
 
     # Define optimizer and loss function (CrossEntropy for classification)
@@ -41,21 +43,25 @@ def train_model(device, model, train_loader, val_loader,
 
     # Calculate total steps
     total_steps = train_loader.total_steps * num_epochs
-    warmup_steps = int(total_steps * 0.1)
+    warmup_steps = int(total_steps * 0.02)
     global_step = 0
+
+    # Get the current timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Define the directory
+    model_dir_path = f'model_saves/emg_force_transformer_{timestamp}'
+    os.makedirs(model_dir_path, exist_ok=True)
     
     for epoch in range(num_epochs):
         print(f'Epoch {epoch+1}/{num_epochs}')
         model.train()
         for batch_idx, (emg_batch, force_gt) in enumerate(train_loader):
             # Update learning rate
-            # lr = get_lr(global_step, total_steps, lr_max, warmup_steps)
-            # for param_group in optimizer.param_groups:
-            #    param_group['lr'] = lr
-            lr = lr_max
+            lr = get_lr(global_step, total_steps, lr_max, warmup_steps)
+            for param_group in optimizer.param_groups:
+               param_group['lr'] = lr
+            #lr = lr_max
 
-            print(f"Batch {batch_idx}:")
-            
             emg_batch = emg_batch.to(device)
             force_gt = force_gt.to(device)
 
@@ -69,15 +75,13 @@ def train_model(device, model, train_loader, val_loader,
                                             model.force_num_classes, model.force_values_range, device, criterion)
 
             # Print and log training loss
-            print(f'Training Loss at step {global_step}: {loss.item():.4f}')
+            print(f'Training Loss at step {global_step}, batch {batch_idx}: {loss.item():.4f}')
             wandb.log({"Training Loss": loss.item(), "Learning Rate": lr, "Global Step": global_step})
 
             # Backward pass and optimization
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
-            global_step += 1
 
             # Validation check
             if global_step % batches_before_validation == 0:
@@ -90,7 +94,7 @@ def train_model(device, model, train_loader, val_loader,
                         force_gt_val = force_val.to(device)
 
                         predicted_force_val = model(emg_val)
-                        loss = discretize_and_take_loss(force_gt_val, predicted_force_val,
+                        val_loss += discretize_and_take_loss(force_gt_val, predicted_force_val,
                                             model.force_num_classes, model.force_values_range, device, criterion).item()
 
                         val_steps += 1
@@ -100,13 +104,13 @@ def train_model(device, model, train_loader, val_loader,
                 print(f'Validation Loss at step {global_step}: {avg_val_loss:.4f}')
                 wandb.log({"Validation Loss": avg_val_loss, "Global Step": global_step})
 
+                torch.save(model.state_dict(), f'{model_dir_path}/{global_step}.pth')
+
                 model.train()  # Switch back to training mode
 
+            global_step += 1
+    
     print('Training complete.')
-    # Get the current timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # Save the model state dictionary with a timestamp in the filename
-    model_filename = f'model_saves/emg_force_transformer_{timestamp}.pth'
-    torch.save(model.state_dict(), model_filename)
+    torch.save(model.state_dict(), f'model_saves/emg_force_transformer_{timestamp}/final_model.pth')
     wandb.finish()

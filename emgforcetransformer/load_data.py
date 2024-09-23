@@ -5,17 +5,17 @@ import numpy as np
 import random
 
 class DataStreamer:
-    def __init__(self, data_indices, file_identifiers,
+    def __init__(self, sequence_indices, file_identifiers,
                  bs, sf, ff,
                  rootpath):
         
-        self.data_indices = data_indices  # Ordered subset of data indices
+        self.sequence_indices = sequence_indices  # Ordered set of Frames
         self.file_identifiers = file_identifiers
         self.bs = bs  # Number of sequences in a batch.
         self.sf = sf  # Number of frames in each sequence.
         self.ff = ff  # Number of frames per file.
         self.rootpath = rootpath
-        self.total_steps = (len(data_indices) * ff) // (sf * bs)
+        self.total_steps = len(sequence_indices) / (bs)
 
     def __iter__(self):
         """
@@ -27,7 +27,7 @@ class DataStreamer:
         emg_data = None
         force_data = None
 
-        for idx in self.data_indices:
+        for idx in self.sequence_indices:
             file_idx, seq_idx = idx
 
             if file_idx != current_file_idx:
@@ -97,9 +97,9 @@ class DataStreamer:
         return emg_data_full, force_data_full
 
 
-def generate_data_indices(subjects, sessions, fingers, samples, frames_per_file, sequence_length):
+def generate_sequence_indices(subjects, sessions, fingers, samples, frames_per_file, sequence_length):
     file_identifiers = []
-    data_indices = []
+    sequence_indices = []
     for subject_idx in range(subjects):
         for session_idx in range(sessions):
             for finger_idx in range(fingers):
@@ -110,20 +110,20 @@ def generate_data_indices(subjects, sessions, fingers, samples, frames_per_file,
 
     for file_idx, _ in enumerate(file_identifiers):
         for seq_idx in range(num_sequences_per_file):
-            data_indices.append((file_idx, seq_idx))
+            sequence_indices.append((file_idx, seq_idx))
 
-    return data_indices, file_identifiers
+    return sequence_indices, file_identifiers
 
-def split_data_indices(data_indices, validation_fraction):
+def split_sequence_indices(data_indices, validation_fraction):
     total_samples = len(data_indices)
     val_size = int(validation_fraction * total_samples)
     train_size = total_samples - val_size
+    
+    # Shuffle the train indices
+    random.shuffle(data_indices)
 
     train_indices = data_indices[:train_size]
     val_indices = data_indices[train_size:]
-
-    # Shuffle the train indices
-    random.shuffle(train_indices)
 
     return train_indices, val_indices
 
@@ -132,14 +132,11 @@ def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, subjects,
     """
     Create data streamers for training and validation.
     """
-    data_indices, file_identifiers = generate_data_indices(
+    sequence_indices, file_identifiers = generate_sequence_indices(
         subjects, sessions, fingers, samples, ff, sf)
 
-    train_indices, val_indices = split_data_indices(data_indices, validation_fraction)
-
-    # Sort train and validation indices to ensure sequential loading
-    train_indices.sort()
-    val_indices.sort()
+    train_indices, val_indices = split_sequence_indices(sequence_indices, validation_fraction)
+    print(f"Total Sequences, training: {len(train_indices)}, validation: {len(val_indices)}")
 
     # Create data streamers
     train_streamer = DataStreamer(train_indices, file_identifiers, bs,

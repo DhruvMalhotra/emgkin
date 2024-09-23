@@ -6,8 +6,8 @@ import torch
 # Define your parameters
 
 # training loop
-validation_fraction = 0.25
-batches_before_validation = 10
+validation_fraction = 0.005
+batches_before_validation = 50
 lr_max = 1e-4
 num_epochs = 5
 force_num_classes = 10
@@ -39,6 +39,10 @@ train_loader, val_loader = create_dataloaders_lazy(
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+import warnings
+# Suppress specific UserWarning
+warnings.filterwarnings("ignore", message=".*Torch was not compiled with flash attention.*")
 
 # Initialize your model
 model = EMGForceTransformer(device = device, d=d, d_latent=d_latent, channels_emg=channels_emg,
