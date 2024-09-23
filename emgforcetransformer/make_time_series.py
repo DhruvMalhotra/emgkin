@@ -4,34 +4,34 @@ import matplotlib.pyplot as plt
 import wfdb
 import os
 import numpy as np
+from force_classify import collapse
 
 # Define your parameters
 
 # training loop
 validation_fraction = 0.25
 batches_before_validation = 10
-
-# epoch/batch
-num_epochs = 5
-batch_size = 5
 lr_max = 1e-4
-chunk_secs = 1
-num_chunks = 25
-assert num_chunks*chunk_secs == 25 # Each file is 25s, and is a sequence
-
-# transformer
-d = 512
-d_latent = 256
-num_encoder_layers = 6
-num_decoder_layers = 6
-nhead = 8
+num_epochs = 5
+force_num_classes = 10
+force_values_range = (-0.2, 0.2)
 
 # data
 channels_emg = 256
 channels_force = 5
-fps_emg = 2048
-fps_force = 100
+bs = 8 # A Batch's sequences
+sc = 16 # A Sequence's chunks
+cf = 16 # A Chunk's frames
+fps = 2048 # Frames per second
+t_sec = 25 # How long is a single file?
+assert bs*sc*cf == fps*25 # One file should be eaten together
 
+# transformer
+d = 256
+d_latent = 128
+num_encoder_layers = 6
+num_decoder_layers = 6
+nhead = 4
 
 # Device configuration
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -55,18 +55,14 @@ record_emg = wfdb.rdrecord(emg_record_path)
 emg_batch = torch.tensor(record_emg.p_signal, dtype=torch.float32)
 force_batch = torch.tensor(record_force.p_signal, dtype=torch.float32)
 
-assert (fps_emg*chunk_secs).is_integer()
-assert (fps_force*chunk_secs).is_integer()
-
 # Initialize your model
-model = EMGForceTransformer(d=d, d_latent=d_latent, channels_emg=channels_emg,
+model = EMGForceTransformer(device = device, d=d, d_latent=d_latent, channels_emg=channels_emg,
                             channels_force=channels_force,
-                            fps_emg=fps_emg, fps_force=fps_force,
-                            chunk_secs=chunk_secs,
-                            num_chunks=num_chunks,
+                            bs = bs , sc = sc, cf = cf,
                             num_encoder_layers=num_encoder_layers,
                             num_decoder_layers=num_decoder_layers,
-                            nhead=nhead)
+                            nhead=nhead,
+                            force_num_classes=force_num_classes, force_values_range=force_values_range)
 
 model.load_state_dict(torch.load(
     os.path.join(script_dir,'model_saves',
@@ -80,24 +76,19 @@ predicted_force = predicted_force.squeeze(0)
 print("predicted_force_shape: " + str(predicted_force.shape))
 print("predicted_force: " + str(predicted_force[0][0]))
 # Move predictions to CPU and detach from computation graph
-predicted_force = predicted_force.detach().cpu().squeeze(0)  # Shape: [num_chunks * fps_force, force_channels, num_classes]
+# Shape: [sc * cf, channels_force, num_classes]
+predicted_force_classes = predicted_force.detach().cpu().squeeze(0)  
 
-# Take the most likely logit to get class predictions
-predicted_classes = predicted_force.argmax(dim=-1)  # Shape: [num_samples, force_channels]
-# Map the classes back to force values in the range [-1, 1]
-num_classes = model.num_classes  # Get number of classes from the model
-bucket_size = 2 / num_classes  # Since force range is from -1 to 1
-# Calculate the center of each bucket
-predicted_force_values = -1 + (predicted_classes + 0.5) * bucket_size  # Shape: [num_samples, force_channels]
+# Shape: [sc * cf, channels_force]
+predicted_force_value = collapse(predicted_force, force_num_classes, force_values_range)
 
 # Convert tensors to NumPy arrays for plotting
 actual_force = force_batch.cpu().numpy()  # Shape: [num_samples, 5]
-predicted_force = predicted_force_values.cpu().numpy()
+predicted_force = predicted_force_value.cpu().numpy()
 
-# Create a time axis based on fps_force
-fps_force = model.fps_force  # 100 fps
+# Create a time axis based on fps
 num_samples = actual_force.shape[0]
-time = np.arange(num_samples) / fps_force  # Time in seconds
+time = np.arange(num_samples) / fps  # Time in seconds
 
 # Plotting section
 plt.figure(figsize=(15, 20))  # For subplots
