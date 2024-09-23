@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import math
+from einops import rearrange
 
 class EMGForceTransformer(nn.Module):
     def __init__(self, channels_emg, channels_force,
@@ -30,8 +31,8 @@ class EMGForceTransformer(nn.Module):
         self.object_queries = nn.Parameter(torch.randn(channels_force, d))
 
         # Decoder Output: projection layer to map transformer outputs to logits over num_classes
-        self.output_projection = nn.Linear(d, self.fc_force, bias=True)
-        self.logits_projection = nn.Linear(self.fc_force, self.fc_force * self.num_classes, bias=True)
+        self.output_projection = nn.Linear(d, self.fc_force * self.num_classes, bias=True)
+        #self.logits_projection = nn.Linear(self.fc_force, self.fc_force * self.num_classes, bias=True)
 
         # Transformer model
         self.transformer = nn.Transformer(d_model=d, nhead=nhead,
@@ -105,7 +106,7 @@ class EMGForceTransformer(nn.Module):
 
     def forward(self, emg_data):
         """
-        emg_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels]
+        emg_data: Tensor of shape [batch_size, num_chunks*chunk_secs*fps_emg, channels_emg]
         """
         batch_size = emg_data.shape[0]  # Extract batch size
 
@@ -113,52 +114,53 @@ class EMGForceTransformer(nn.Module):
         assert emg_data.shape[1] == self.num_chunks * self.chunk_secs * self.fps_emg, \
             f"Expected emg_data.shape[1] == {self.num_chunks * self.chunk_secs * self.fps_emg}, but got {emg_data.shape[1]}"
 
-
         # Step 2: Chunk the data into segments of chunk_secs
         # Reshape and transpose to get chunks: [batch_size, num_chunks, channels, frames in Chunk]
-        emg_chunks = emg_data.view(
-            batch_size, self.num_chunks, self.fc_emg, self.channels_emg).transpose(2, 3)
-       
+        # emg_chunks = emg_data.view(
+        #    batch_size, self.num_chunks, chunk_secs*fps_emg, self.channels_emg).transpose(2, 3)
+        emg_chunks = rearrange(emg_data, 'a (b c) d -> a (b d) c', b=self.num_chunks, c=self.fc_emg)
+
         # Step 3: Embed each emg chunk to D dimensions
-        # [batch_size, num_chunks, channels_emg, d]
+        # [batch_size, num_chunks*channels_emg, d]
         v_emg_embedded = self.input_projection(emg_chunks) # nn.Linear applies to last dimension
 
         # Step 4: Prepare decoder input
-        # Repeat object queries, num_chunks time * batch_size times. Use .expand() to share same underlying data.
+        # Repeat object queries, num_chunks * batch_size times. Use .expand() to share same underlying data.
+        # object queries [channels_force, d]
         v_force_embedded = self.object_queries.unsqueeze(0).unsqueeze(0).expand(
             batch_size, self.num_chunks, -1, -1)  # [batch_size, num_chunks, channels_force, d]
-        assert v_force_embedded.numel() == batch_size*self.num_chunks*self.channels_force*self.d
-
-        # Step 5: Reshape to 1D sequences suitable for the transformer
-        # Transformer expects input of shape [Batch Size, Sequence Length, Embedding Dim]
-        emg_sequence = v_emg_embedded.reshape(
-            batch_size, self.num_chunks*self.channels_emg, self.d)
-        force_sequence = v_force_embedded.reshape(
+        v_force_embedded = v_force_embedded.reshape(
             batch_size, self.num_chunks*self.channels_force, self.d)
-        
+        assert v_force_embedded.shape == (batch_size, self.num_chunks * self.channels_force, self.d), \
+            f"Shape mismatch: Expected {(batch_size, self.num_chunks * self.channels_force, self.d)}, " \
+            f"but got {v_force_embedded.shape}"
+
         # Step 6: Add positional embeddings, unsqueeze to allow for batch dim
+        # self.emg_pos_embedding shape is [num_chunks*channels_emg, d]
+        # v_emg_embedded.shape: [batch_size, num_chunks*channels_emg, d]
         device = emg_data.device
         emg_pos_embedding = self.emg_pos_embedding.to(device)
         force_pos_embedding = self.force_pos_embedding.to(device)
-        emg_sequence += emg_pos_embedding.unsqueeze(0)
-        force_sequence += force_pos_embedding.unsqueeze(0)
+        emg_sequence = v_emg_embedded + emg_pos_embedding[None, ...]
+        force_sequence = v_force_embedded + force_pos_embedding[None, ...]
 
         # Step 7 & 8: Pass through transformer encoder and decoder
+        # Transformer expects input of shape [Batch Size, Sequence Length, Embedding Dim]
         transformer_output = self.transformer(
             src=emg_sequence, tgt=force_sequence)
         # transformer_output: [batch_size, num_chunks*self.channels_force, d]
 
         # Step 9: Reshape transformer output to [batch_size, num_chunks, channels_force, d]
-        transformer_output = transformer_output.view(
-            batch_size, self.num_chunks, self.channels_force, self.d)
+        transformer_output = rearrange(transformer_output,
+                                       'a (b c) d -> a b c d',
+                                       b=self.num_chunks, c=self.channels_force)
 
         # Map transformer outputs to predicted force data with logits over classes
-        predicted_force = self.logits_projection(self.output_projection(transformer_output))
-        predicted_force = predicted_force.view(
-            batch_size, self.num_chunks, self.channels_force, self.fc_force, self.num_classes)
-        predicted_force = predicted_force.permute(0, 1, 3, 2, 4)
-        predicted_force = predicted_force.reshape(
-            batch_size, self.num_chunks * self.fc_force, self.channels_force, self.num_classes)
-
+        # [batch_size, num_chunks, channels_force, fc_force*num_classes]
+        predicted_force = self.output_projection(transformer_output)
+        predicted_force = rearrange(predicted_force,
+                                    'a b c (d e) -> a (b d) c e',
+                                    d=self.fc_force, e=self.num_classes)
+        
         # Return: [batch_size, num_frames, channels_force, num_classes]
         return predicted_force

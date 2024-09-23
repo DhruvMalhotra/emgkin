@@ -12,7 +12,7 @@ validation_fraction = 0.25
 batches_before_validation = 10
 
 # epoch/batch
-num_epochs = 1
+num_epochs = 5
 batch_size = 5
 lr_max = 1e-4
 chunk_secs = 1
@@ -70,7 +70,7 @@ model = EMGForceTransformer(d=d, d_latent=d_latent, channels_emg=channels_emg,
 
 model.load_state_dict(torch.load(
     os.path.join(script_dir,'model_saves',
-                 'emg_force_transformer_20240921_194443.pth')))
+                 'emg_force_transformer_20240922_105644.pth')))
 model.eval()
 
 predicted_force = model(emg_batch.unsqueeze(0)) # add the batch dimension.

@@ -1,7 +1,12 @@
 from emgforcetransformer import EMGForceTransformer
 from train_model import train_model
 from load_data import create_dataloaders_lazy, debug_dataloader
-import torch 
+import torch
+
+# classes/normalize/clamp
+# d = updimming fc_emg 2-4x, 8 perfect
+# smaller chunks
+# try synthetic data
 
 # Define your parameters
 
@@ -13,16 +18,16 @@ batches_before_validation = 10
 num_epochs = 5
 batch_size = 5
 lr_max = 1e-4
-chunk_secs = 1
-num_chunks = 25
-assert num_chunks*chunk_secs == 25 # Each file is 25s, and is a sequence
+chunk_secs = .25
+num_chunks = 100
+assert num_chunks*chunk_secs == 25  # Each file is 25s, and is a sequence
 
 # transformer
-d = 512
-d_latent = 256
+d = 32
+d_latent = 128
 num_encoder_layers = 6
 num_decoder_layers = 6
-nhead = 8
+nhead = 4
 
 # data
 channels_emg = 256

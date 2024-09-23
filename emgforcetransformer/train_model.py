@@ -34,12 +34,14 @@ def get_lr(step, total_steps, lr_max, warmup_steps):
         return lr_max * 0.5 * (1 + math.cos(math.pi * (step - warmup_steps) / (total_steps - warmup_steps)))
 
 def discretize_and_take_loss(force_gt, predicted_force, num_classes, device, criterion):
+    # predicted_force.shape = [batch_size, num_chunks*chunk_secs*fps_force, channels_force, num_classes]
+    
     # Discretize force values into class labels
     force_gt_labels = discretize_force(force_gt, num_classes).to(device)
 
     # Reshape predictions to [batch_size * num_frames * channels_force, num_classes]
-    predicted_force = predicted_force.view(-1, num_classes)
-    force_gt_labels = force_gt_labels.view(-1)  # Flatten labels to match predictions
+    predicted_force = predicted_force.reshape(-1, num_classes)
+    force_gt_labels = force_gt_labels.reshape(-1)  # Flatten labels to match predictions
 
     # Compute loss
     return criterion(predicted_force, force_gt_labels)
@@ -77,7 +79,7 @@ def train_model(device, model, train_loader, val_loader,
 
             # Forward pass
             # [batch_size, num_chunks*chunk_secs*fps_emg, emg_channels] ->
-            # [batch_size, num_chunks*chunk_secs*fps_force, force_channels]
+            # [batch_size, num_chunks*chunk_secs*fps_force, force_channels, num_classes]
             predicted_force = model(emg_batch)
 
             # Compute loss
