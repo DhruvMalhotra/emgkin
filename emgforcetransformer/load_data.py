@@ -92,7 +92,7 @@ class DataStreamer:
         if force_data_full.shape[0] != emg_data_full.shape[0]:
             upsampled_force = upsample_fractional(force_data_full.T.numpy(),
                                                     emg_data_full.shape[0] / force_data_full.shape[0]).T
-            force_data_full = torch.tensor(upsampled_force.T, dtype=torch.float32)
+            force_data_full = torch.tensor(upsampled_force, dtype=torch.float32)
 
         return emg_data_full, force_data_full
 
