@@ -91,7 +91,7 @@ class DataStreamer:
         # Upsample force data if necessary
         if force_data_full.shape[0] != emg_data_full.shape[0]:
             upsampled_force = upsample_fractional(force_data_full.T.numpy(),
-                                                    emg_data_full.shape[0] / force_data_full.shape[0])
+                                                    emg_data_full.shape[0] / force_data_full.shape[0]).T
             force_data_full = torch.tensor(upsampled_force.T, dtype=torch.float32)
 
         return emg_data_full, force_data_full
@@ -136,7 +136,6 @@ def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, subjects,
         subjects, sessions, fingers, samples, ff, sf)
 
     train_indices, val_indices = split_sequence_indices(sequence_indices, validation_fraction)
-    print(f"Total Sequences, training: {len(train_indices)}, validation: {len(val_indices)}")
 
     # Create data streamers
     train_streamer = DataStreamer(train_indices, file_identifiers, bs,
@@ -144,6 +143,8 @@ def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, subjects,
     val_streamer = DataStreamer(val_indices, file_identifiers, bs,
                                 sf, ff, rootpath)
 
+
+    print(f"Total Sequences, training: {len(train_indices)}, validation: {len(val_indices)}. Steps/Epoch: {train_streamer.total_steps}")
     return train_streamer, val_streamer
 
 def upsample_fractional(signal, factor):

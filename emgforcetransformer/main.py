@@ -18,12 +18,12 @@ channels_emg = 256
 channels_force = 5
 bs = 5 # A Batch's sequences
 sc = 32 # A Sequence's chunks
-cf = 80 # A Chunk's frames
+cf = 160 # A Chunk's frames
 fps = 2048 # Frames per second
 t_sec = 25 # How long is a single file?
 
 # transformer
-d = 256
+d = 512
 d_latent = 128
 num_encoder_layers = 6
 num_decoder_layers = 6
