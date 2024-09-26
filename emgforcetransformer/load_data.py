@@ -127,11 +127,15 @@ def split_sequence_indices(data_indices, validation_fraction):
 
     return train_indices, val_indices
 
-def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, subjects,
-                          sessions=2, fingers=5, samples=3):
+def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, dataload):
     """
     Create data streamers for training and validation.
     """
+    subjects = dataload[0]
+    sessions = dataload[1]
+    fingers = dataload[2]
+    samples = dataload[3]
+
     sequence_indices, file_identifiers = generate_sequence_indices(
         subjects, sessions, fingers, samples, ff, sf)
 
@@ -143,7 +147,12 @@ def create_dataloaders_lazy(validation_fraction, bs, sf, ff, rootpath, subjects,
     val_streamer = DataStreamer(val_indices, file_identifiers, bs,
                                 sf, ff, rootpath)
 
-
+    assert (len(train_indices) + len(val_indices) == (subjects * sessions * fingers * samples * ff / sf)), (
+        f"Assertion failed: The number of train and validation sequences ({len(train_indices) + len(val_indices)}) "
+        f"does not match the expected value ({subjects * sessions * fingers * samples * ff / sf}). "
+        f"Details: len(train_indices)={len(train_indices)}, len(val_indices)={len(val_indices)}, "
+        f"subjects={subjects}, sessions={sessions}, fingers={fingers}, samples={samples}, ff={ff}.")
+    
     print(f"Total Sequences, training: {len(train_indices)}, validation: {len(val_indices)}. Steps/Epoch: {train_streamer.total_steps}")
     return train_streamer, val_streamer
 

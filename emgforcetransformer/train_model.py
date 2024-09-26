@@ -29,7 +29,8 @@ def discretize_and_take_loss(force_gt, predicted_force, num_classes, values_rang
     return criterion(predicted_force, force_gt_labels)
 
 # Training loop
-def train_model(device, model, train_loader, val_loader,
+def train_model(device, model, force_num_classes, force_values_range,
+                train_loader, val_loader,
                 batches_before_validation=100,
                 num_epochs=10, lr_max=1e-4):
     # Initialize wandb
@@ -72,7 +73,7 @@ def train_model(device, model, train_loader, val_loader,
 
             # Compute loss
             loss = discretize_and_take_loss(force_gt, predicted_force,
-                                            model.force_num_classes, model.force_values_range, device, criterion)
+                                            force_num_classes, force_values_range, device, criterion)
 
             # Print and log training loss
             print(f'Training Loss at step {global_step}, batch {batch_idx}: {loss.item():.4f}')
@@ -95,7 +96,7 @@ def train_model(device, model, train_loader, val_loader,
 
                         predicted_force_val = model(emg_val)
                         val_loss += discretize_and_take_loss(force_gt_val, predicted_force_val,
-                                            model.force_num_classes, model.force_values_range, device, criterion).item()
+                                            force_num_classes, force_values_range, device, criterion).item()
 
                         val_steps += 1
 

@@ -7,7 +7,7 @@ class EMGForceTransformer(nn.Module):
     def __init__(self, device, channels_emg, channels_force,
                  bs, sc, cf,
                  d, d_latent, num_encoder_layers, num_decoder_layers, nhead,
-                 force_num_classes, force_values_range):  # Number of force classification buckets)
+                 force_num_classes):
         super().__init__()
         self.d = d  # Embedding dimension
         self.d_latent = d_latent
@@ -17,7 +17,6 @@ class EMGForceTransformer(nn.Module):
         self.sc = sc  # a seqience has this many chunks
         self.bs = bs  # a batch has this many sequences
         self.force_num_classes = force_num_classes  # Number of classes (buckets)
-        self.force_values_range = force_values_range # Force Range
 
         # Encoder Input: projection layer to map emg input to d
         self.input_projection = nn.Linear(self.cf, d, bias=True)
