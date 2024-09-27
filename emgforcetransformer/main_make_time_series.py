@@ -50,7 +50,6 @@ model = EMGForceTransformer(device=device, d=d, d_latent=d_latent, channels_emg=
                             nhead=nhead,
                             force_num_classes=force_num_classes).to(device)
 '''
-
 model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=channels_force, force_num_classes=force_num_classes,
             hidden_dims=[256, 256, 256, 256, 256]).to(device)
 '''

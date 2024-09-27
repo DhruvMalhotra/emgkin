@@ -27,15 +27,15 @@ fps = 2048 # Frames per second
 t_sec = 25 # How long is a single file?
 
 # transformer
-d = 512
-d_latent = 128
-num_encoder_layers = 6
-num_decoder_layers = 6
+d = 64
+d_latent = 32
+num_encoder_layers = 2
+num_decoder_layers = 2
 nhead = 4
 
 #### For main_train
 # subjects, sessions = 2, fingers = 5, samples = 3
-main_train_dataload = [1, 1, 2, 3]
+main_train_dataload = [1, 1, 1, 1]
 
 
 # Device configuration
