@@ -118,9 +118,6 @@ def split_sequence_indices(data_indices, validation_fraction):
     total_samples = len(data_indices)
     val_size = int(validation_fraction * total_samples)
     train_size = total_samples - val_size
-    
-    # Shuffle the train indices
-    random.shuffle(data_indices)
 
     train_indices = data_indices[:train_size]
     val_indices = data_indices[train_size:]

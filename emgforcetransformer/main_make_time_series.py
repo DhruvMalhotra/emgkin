@@ -40,7 +40,7 @@ force_gt = torch.tensor(record_force.p_signal, dtype=torch.float32).to(device)
 force_gt = upsample_fractional(
     force_gt.cpu().numpy().T, emg_batch.shape[0] / force_gt.shape[0]).T
 
-'''
+
 # Initialize your model
 model = EMGForceTransformer(device=device, d=d, d_latent=d_latent, channels_emg=channels_emg,
                             channels_force=channels_force,
@@ -53,10 +53,10 @@ model = EMGForceTransformer(device=device, d=d, d_latent=d_latent, channels_emg=
 
 model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=channels_force, force_num_classes=force_num_classes,
             hidden_dims=[256, 256, 256, 256, 256]).to(device)
-
+'''
 model.load_state_dict(torch.load(
-    os.path.join(script_dir, 'model_saves', 'emg_force_transformer_20240926_223413',
-                 '26350.pth')))
+    os.path.join(script_dir, 'model_saves', 'emg_force_transformer_20240926_233208',
+                 '65000.pth')))
 model.eval()
 
 # Initialize a list to store predictions

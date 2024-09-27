@@ -35,7 +35,7 @@ def train_model(device, model, force_num_classes, force_values_range,
                 num_epochs=10, lr_max=1e-4):
     # Initialize wandb
     os.environ["WANDB_SILENT"] = "true"
-    wandb.init(project = "emgforcetransformer-einsir")
+    wandb.init(project = "emgforcetransformer-overfit")
     model = model.to(device)
 
     # Define optimizer and loss function (CrossEntropy for classification)

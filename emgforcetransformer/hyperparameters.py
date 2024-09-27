@@ -10,8 +10,8 @@ __all__ = ['validation_fraction', 'batches_before_validation', 'lr_max', 'num_ep
 # Define your parameters
 
 # training loop
-validation_fraction = 0
-batches_before_validation = 50
+validation_fraction = 0.01
+batches_before_validation = 5000
 lr_max = 1e-4
 num_epochs = 500
 force_num_classes = 10
@@ -35,7 +35,7 @@ nhead = 4
 
 #### For main_train
 # subjects, sessions = 2, fingers = 5, samples = 3
-main_train_dataload = [1, 1, 1, 1]
+main_train_dataload = [1, 1, 2, 3]
 
 
 # Device configuration
