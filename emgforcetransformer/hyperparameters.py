@@ -10,19 +10,19 @@ __all__ = ['validation_fraction', 'batches_before_validation', 'lr_max', 'num_ep
 # Define your parameters
 
 # training loop
-validation_fraction = 0.005
+validation_fraction = 0
 batches_before_validation = 50
 lr_max = 1e-4
-num_epochs = 5
+num_epochs = 500
 force_num_classes = 10
 force_values_range = (-0.2, 0.2)
 
 # data
 channels_emg = 256
 channels_force = 5
-bs = 5 # A Batch's sequences
-sc = 8 # A Sequence's chunks
-cf = 160 # A Chunk's frames
+bs = 16 # A Batch's sequences
+sc = 16 # A Sequence's chunks
+cf = 1 # A Chunk's frames
 fps = 2048 # Frames per second
 t_sec = 25 # How long is a single file?
 
@@ -34,8 +34,8 @@ num_decoder_layers = 6
 nhead = 4
 
 #### For main_train
-# subjects, sessions, fingers, samples
-main_train_dataload = [1, 2, 5, 3]
+# subjects, sessions = 2, fingers = 5, samples = 3
+main_train_dataload = [1, 1, 1, 1]
 
 
 # Device configuration

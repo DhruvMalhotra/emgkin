@@ -1,5 +1,6 @@
 import warnings
 from emgforcetransformer import EMGForceTransformer
+from mlp import MLP
 import torch
 import matplotlib.pyplot as plt
 import wfdb
@@ -19,10 +20,10 @@ warnings.filterwarnings(
     "ignore", message=".*Torch was not compiled with flash attention.*")
 
 # Define subject, session, and sample identifiers
-subject = 'subject02'
+subject = 'subject01'
 session = 'session1'
-force_sample = '1dof_force_finger4_sample1'
-emg_sample = '1dof_preprocess_finger4_sample1'
+force_sample = '1dof_force_finger1_sample1'
+emg_sample = '1dof_preprocess_finger1_sample1'
 
 # Construct file paths
 force_record_path = os.path.join(
@@ -39,6 +40,7 @@ force_gt = torch.tensor(record_force.p_signal, dtype=torch.float32).to(device)
 force_gt = upsample_fractional(
     force_gt.cpu().numpy().T, emg_batch.shape[0] / force_gt.shape[0]).T
 
+'''
 # Initialize your model
 model = EMGForceTransformer(device=device, d=d, d_latent=d_latent, channels_emg=channels_emg,
                             channels_force=channels_force,
@@ -47,10 +49,14 @@ model = EMGForceTransformer(device=device, d=d, d_latent=d_latent, channels_emg=
                             num_decoder_layers=num_decoder_layers,
                             nhead=nhead,
                             force_num_classes=force_num_classes).to(device)
+'''
+
+model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=channels_force, force_num_classes=force_num_classes,
+            hidden_dims=[256, 256, 256, 256, 256]).to(device)
 
 model.load_state_dict(torch.load(
-    os.path.join(script_dir, 'model_saves', 'emg_force_transformer_20240923_034302',
-                 '50.pth')))
+    os.path.join(script_dir, 'model_saves', 'emg_force_transformer_20240926_223413',
+                 '26350.pth')))
 model.eval()
 
 # Initialize a list to store predictions
@@ -101,6 +107,10 @@ predicted_force_downsampled = upsample_fractional(predicted_force.T, 0.01).T
 num_samples = force_gt_downsampled.shape[0]
 time = np.arange(num_samples) / fps  # Time in seconds
 
+# Calculate the global min and max for y-axis limits
+y_min = min(force_gt_downsampled.min(), predicted_force_downsampled.min())
+y_max = max(force_gt_downsampled.max(), predicted_force_downsampled.max())
+
 # Plotting section
 plt.figure(figsize=(15, 20))  # For subplots
 for i in range(5):
@@ -112,6 +122,7 @@ for i in range(5):
     plt.title(f'Finger {i + 1} Force Prediction')
     plt.xlabel('Time (s)')
     plt.ylabel('Force')
+    plt.ylim(y_min, y_max)  # Set the y-axis limits for all plots
     plt.legend()
     plt.grid(True)
 

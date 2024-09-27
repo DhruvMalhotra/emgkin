@@ -29,7 +29,7 @@ model = EMGForceTransformer(device = device, d=d, d_latent=d_latent, channels_em
 '''
 
 model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=channels_force, force_num_classes=force_num_classes,
-            hidden_dims=[16, 16, 16])
+            hidden_dims=[256, 256, 256, 256, 256])
 
 # Start training
 train_model(device, model,
