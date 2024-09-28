@@ -29,13 +29,13 @@ def discretize_and_take_loss(force_gt, predicted_force, num_classes, values_rang
     return criterion(predicted_force, force_gt_labels)
 
 # Training loop
-def train_model(device, model, force_num_classes, force_values_range,
+def train_model(device, model, wandb_project_name, force_num_classes, force_values_range,
                 train_loader, val_loader,
                 batches_before_validation=100,
-                num_epochs=10, lr_max=1e-4):
+                num_epochs=10, lr_max=1e-4,):
     # Initialize wandb
     os.environ["WANDB_SILENT"] = "true"
-    wandb.init(project = "emgforcetransformer-vit-overfit")
+    wandb.init(project = wandb_project_name)
     model = model.to(device)
 
     # Define optimizer and loss function (CrossEntropy for classification)

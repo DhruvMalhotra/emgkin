@@ -11,10 +11,6 @@ from einops import rearrange
 from load_data import upsample_fractional
 from hyperparameters import *
 
-# This will get the current script's directory
-script_dir = os.path.dirname(os.path.abspath(__file__))
-base_dir = os.path.join(script_dir, '..', 'data', '1dof_dataset')
-
 # Suppress specific UserWarning
 warnings.filterwarnings(
     "ignore", message=".*Torch was not compiled with flash attention.*")
@@ -27,8 +23,8 @@ emg_sample = '1dof_preprocess_finger1_sample1'
 
 # Construct file paths
 force_record_path = os.path.join(
-    base_dir, f'{subject}_{session}', force_sample)
-emg_record_path = os.path.join(base_dir, f'{subject}_{session}', emg_sample)
+    data_dir, f'{subject}_{session}', force_sample)
+emg_record_path = os.path.join(data_dir, f'{subject}_{session}', emg_sample)
 
 # Load the records using wfdb
 record_force = wfdb.rdrecord(force_record_path)

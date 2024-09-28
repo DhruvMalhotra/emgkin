@@ -10,7 +10,7 @@ train_loader, val_loader = create_dataloaders_lazy(
     validation_fraction, bs,
     sc * cf, # frames in a sequence, sf
     t_sec * fps, # frames in file, ff
-    r"C:\Users\Dhruv\Desktop\emgkin\data\1dof_dataset",
+    data_dir,
     main_train_dataload)
 
 import warnings
@@ -32,7 +32,7 @@ model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=cha
             hidden_dims=[256, 256, 256, 256, 256])
 
 # Start training
-train_model(device, model,
+train_model(device, model, wandb_project_name,
             force_num_classes, force_values_range,
             train_loader, val_loader,
             batches_before_validation=batches_before_validation,
