@@ -17,9 +17,8 @@ import warnings
 # Suppress specific UserWarning
 warnings.filterwarnings("ignore", message=".*Torch was not compiled with flash attention.*")
 
-'''
 # Initialize your model
-model = EMGForceTransformer(device = device, d=d, d_latent=d_latent, channels_emg=channels_emg,
+model = EMGForceTransformer(device = device, d_model=d_model, d_latent=d_latent, channels_emg=channels_emg,
                             channels_force=channels_force,
                             bs = bs , sc = sc, cf = cf,
                             num_encoder_layers=num_encoder_layers,
@@ -27,14 +26,13 @@ model = EMGForceTransformer(device = device, d=d, d_latent=d_latent, channels_em
                             nhead=nhead,
                             force_num_classes=force_num_classes)
 '''
-
 model = MLP(sequence_length=sc*cf, channels_emg=channels_emg, channels_force=channels_force, force_num_classes=force_num_classes,
             hidden_dims=[256, 256, 256, 256, 256])
-
+'''
 # Start training
 train_model(device, model, wandb_project_name,
             force_num_classes, force_values_range,
             train_loader, val_loader,
             batches_before_validation=batches_before_validation,
             num_epochs=num_epochs,
-            lr_max=lr_max)
+            lr_cold_start=lr_cold_start, lr_max=lr_max)

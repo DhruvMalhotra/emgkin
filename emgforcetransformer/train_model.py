@@ -6,10 +6,12 @@ import math
 import os
 from force_classify import classify
 
-def get_lr(step, total_steps, lr_max, warmup_steps):
+def get_lr(step, total_steps, lr_cold_start, lr_max):
     """
     Calculate the learning rate with warmup and cosine decay
     """
+    warmup_steps = int(total_steps * 0.20)
+
     if step < warmup_steps:
         return lr_max * step / warmup_steps
     else:
@@ -29,10 +31,11 @@ def discretize_and_take_loss(force_gt, predicted_force, num_classes, values_rang
     return criterion(predicted_force, force_gt_labels)
 
 # Training loop
-def train_model(device, model, wandb_project_name, force_num_classes, force_values_range,
+def train_model(device, model, wandb_project_name,
+                force_num_classes, force_values_range,
                 train_loader, val_loader,
-                batches_before_validation=100,
-                num_epochs=10, lr_max=1e-4,):
+                batches_before_validation,
+                num_epochs, lr_cold_start, lr_max):
     # Initialize wandb
     os.environ["WANDB_SILENT"] = "true"
     wandb.init(project = wandb_project_name)
@@ -44,7 +47,6 @@ def train_model(device, model, wandb_project_name, force_num_classes, force_valu
 
     # Calculate total steps
     total_steps = train_loader.total_steps * num_epochs
-    warmup_steps = int(total_steps * 0.02)
     global_step = 0
 
     # Get the current timestamp
@@ -58,7 +60,7 @@ def train_model(device, model, wandb_project_name, force_num_classes, force_valu
         model.train()
         for batch_idx, (emg_batch, force_gt) in enumerate(train_loader):
             # Update learning rate
-            lr = get_lr(global_step, total_steps, lr_max, warmup_steps)
+            lr = get_lr(global_step, total_steps,  lr_cold_start, lr_max)
             for param_group in optimizer.param_groups:
                param_group['lr'] = lr
             #lr = lr_max
@@ -68,7 +70,7 @@ def train_model(device, model, wandb_project_name, force_num_classes, force_valu
 
             # Forward pass
             # [bs, sc*cf, emg_channels] ->
-            # [bs, sc*cf, force_channels, num_classes]
+            # [bs, sc*cf, force_channels, num_classes]    
             predicted_force = model(emg_batch)
 
             # Compute loss
@@ -89,6 +91,7 @@ def train_model(device, model, wandb_project_name, force_num_classes, force_valu
                 model.eval()
                 val_loss = 0.0
                 val_steps = 0
+
                 with torch.no_grad():
                     for val_idx, (emg_val, force_val) in enumerate(val_loader):
                         emg_val = emg_val.to(device)
