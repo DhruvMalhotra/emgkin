@@ -3,93 +3,67 @@
 ### **Step 1: Raw Data Shape**
 - **EMG:**
   - 64 channels, 4 arrays → 256 channels total
-  - `fps_emg = 2048`
+  - `fps = 2048`
   - Shape: `[t_secs * fps_emg , 256]`
   
-- **Force:**
+- **Upsample Force:**
   - 5 channels
-  - `fps_force = 100`
+  - `fps_force = 100` -> `fps = 2048`
   - Shape: `[t_secs * fps_force , 5]`
 
----
+Shape: `[25 * fps , 256]`
+Shape: `[25 * fps , 5]`
 
-### **Step 2: Chunk 0.1s Together**
-- Number of frames in a chunk: `fc = 0.1 * fps`
-- Number of chunks: `num_chunks = t_secs / 0.1`
+### **Step 2.1: Make sequences and batches**
+  - Batch -> Sequence -> Chunk -> Frame
+  - cf = a chunk's frames (or frames in a chunk)
+  - sc = a sequence's chunks
+  - sf = a sequence's frames = sc * cf
+  - bs = a batch's sequences
 
-- **EMG:**
-  - Shape: `[t_secs / 0.1 , 256 , fc_emg]`
-  - `fc_emg = 0.1 * fps_emg = 0.1 * 2048 = 204.8 ≈ 204`
+Shape: `[bs, sc * cf , 256]`
+Shape: `[bs, sc * cf , 5]`
 
-- **Force:**
-  - Shape: `[t_secs / 0.1 , 5 , fc_force]`
-  - `fc_force = 0.1 * fps_force = 0.1 * 100 = 10`
+### **Step 2.2: EMG: Chunk cf frames Together** and transpose to get chunks
 
----
+Shape: `[bs, sc, cf , 256]` -> Shape: `[bs, sc * 256, cf]`
 
-### **Step 3: Embed a Chunk to D Dimensions**
-Both EMG and force chunks are mapped to the same dimension **D**:
+### **Step 3: EMG: Embed a Chunk to d Dimensions**
+Transpose cf with the channels and map to the same dimension **d**:
+Use nn.Linear with bias
+d > 4*cf (ideally)
 
-- **EMG:**
-  - Shape: `[num_chunks , 256 , D]`
+Shape: `[bs, sc * 256, d]`
 
-- **Force:**
-  - Shape: `[num_chunks , 5 , D]`
+### **Step 4: Decoder Input**
+Object Queries
+`[5, d] -> tiled to [bs, sc * 5 , d]`
 
-For embedding a single element of size `f`, we learn weight matrices `W`:
-  
-- We need to learn a matrix `W[D, f]` such that:
-  - `W[D, f] x v[f] = v'[D]`
-
-To introduce non-linearity, we use two learned matrices:
-  
-- `W_2[D, 256] x ReLU(W_1[256, f] x v[f])`
-
-This means we learn the following:
-
+### **Step 5: Add Sinusoidal Positional Embedding**
 - **For EMG:**
-  - `W_2_emg[D, 256] x ReLU(W_1_emg[256, fc_emg] x v[fc_emg])`
+  - Add 4D positional embeddings corresponding to `[sc , 256]` of dimension **d**.
+  - The 4 dimensions are **Tx4x8x8**.
 
 - **For Force:**
-  - `W_2_force[D, 256] x ReLU(W_1_force[256, fc_force] x v[fc_force])`
+  - Add 2D positional embeddings corresponding to `[sc , 5]` of dimension **d**.
+  - The dimensions represent **Time** and **5 finger channels**.
 
----
 
-### **Step 4: Add Sinusoidal Positional Embedding**
-- **For EMG:**
-  - Add 3D positional embeddings corresponding to `[num_chunks , 256]` of dimension **D**.
-  - The 3 dimensions are **8x8x4**.
+### **Step 6: Transformer**
+- The encoder consists of **self-attention**.
+- The decoder consists of **interleaved self-attention** and **cross-attention** with the encoder output.
 
-- **For Force:**
-  - Add 1D positional embeddings corresponding to `[num_chunks , 5]` of dimension **D**.
-  - The 1 dimension represents the **5 finger channels**.
+### **Step 7.1: Reshape Transformer output to take out d**
+`[bs, sc * 5 , d] -> [bs, sc, 5 , d]` 
 
-- **Final Shapes:**
-  - **EMG:** `v[num_chunks , 256 , D] + pos[num_chunks , 256 , D]`
-  - **Force:** `v[num_chunks , 5 , D] + pos[num_chunks , 5 , D]`
+### **Step 7.2: Apply the output learnable layer to get logits over chunks**
+`[bs, sc * 5 , d] -> [bs, sc, 5 , cf * num_classes]` 
 
----
-
-### **Step 5: Reshape to 1D Sequence for Transformer**
-To prepare the data for the transformer, reshape the embeddings:
-
-- **EMG:** `[N_emg, D]`, where `N_emg = num_chunks * 256`
-- **Force:** `[N_force, D]`, where `N_force = num_chunks * 5`
-
----
-
-### **Step 6: Transformer Encoder**
-- The encoder consists of **Mx** layers.
-- It takes in `[N_emg, D]` and applies **self-attention** to produce `[N_emg, D]`.
-
----
-
-### **Step 7: Transformer Decoder**
-- The decoder consists of **Nx** layers.
-- It takes in `[N_force, D]` and performs **interleaved self-attention** and **cross-attention** with the encoder output.
-
----
+### **Step 7.3: Prepare final output for loss**
+Input was `[bs, sc * cf , 256]`
+So output has to be `[bs, sc * cf , 5, num_classes]`
+`[bs, sc, 5 , fc * num_classes] -> [bs, sc * cf , 5, num_classes]` 
 
 ### **Step 8: Loss Calculation**
-- Use **Mean Square Error (MSE)** as the loss function to compute the difference between predicted and actual force values.
+- Use **Cross Entropy Loss** as the loss function to compute the difference between predicted and actual force values.
 - Optimize the model using **Stochastic Gradient Descent (SGD)**.

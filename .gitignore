@@ -1934,3 +1934,4 @@ __pycache__/upsample_fractional.cpython-312.pyc
 emgforcetransformer/__pycache__/
 emgforcetransformer/wandb/
 wandb/
+emgforcetransformer/model_saves
